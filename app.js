@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="jebra" data-task="Read" ${day.jebraRead ? 'checked' : ''}>
                                 </label>
                                 <label class="task-item">
-                                    <span>Gym</span>
+                                    <span>Gym or any task</span>
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="jebra" data-task="Gym" ${day.jebraGym ? 'checked' : ''}>
                                 </label>
                                 <label class="task-item">
@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="memo" data-task="Read" ${day.memoRead ? 'checked' : ''}>
                                 </label>
                                 <label class="task-item">
-                                    <span>Gym</span>
+                                    <span>Gym or any task</span>
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="memo" data-task="Gym" ${day.memoGym ? 'checked' : ''}>
                                 </label>
                                 <label class="task-item">
