@@ -1,0 +1,338 @@
+document.addEventListener('DOMContentLoaded', () => {
+    // --- Navigation Logic ---
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            navBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(t => t.classList.remove('active'));
+            
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.target).classList.add('active');
+            
+            if(btn.dataset.target === 'stats' || btn.dataset.target === 'leaderboard') {
+                updateStats();
+            }
+        });
+    });
+
+    // --- JSONBin Configuration ---
+    const BIN_ID = '6a3ebe30f5f4af5e293580e5';
+    const MASTER_KEY = '$2a$10$SPofQVDTLbGZ3eu2A8nI4OK5KLQwrFCmO.yX4sAA0QntFU8r0xrUS';
+    const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+
+    let data = [];
+    const trackerList = document.getElementById('tracker-list');
+    const todayContainer = document.getElementById('today-container');
+    const oldDaysList = document.getElementById('old-days-list');
+    const oldDaysWrapper = document.getElementById('old-days-wrapper');
+    const trackerDivider = document.getElementById('tracker-divider');
+    const addDayBtn = document.getElementById('add-day-btn');
+
+    // UI Loading state
+    const setLoading = (isLoading) => {
+        if(isLoading) {
+            trackerList.style.opacity = '0.5';
+            todayContainer.style.opacity = '0.5';
+            trackerList.style.pointerEvents = 'none';
+            todayContainer.style.pointerEvents = 'none';
+            addDayBtn.innerText = 'Syncing...';
+            addDayBtn.disabled = true;
+        } else {
+            trackerList.style.opacity = '1';
+            todayContainer.style.opacity = '1';
+            trackerList.style.pointerEvents = 'all';
+            todayContainer.style.pointerEvents = 'all';
+            addDayBtn.innerText = 'Add Next Day';
+            addDayBtn.disabled = false;
+        }
+    };
+
+    // --- Date Generation Logic ---
+    const getDaysUntilEndOfMonth = () => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = today.getMonth();
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        
+        const days = [];
+        for (let i = today.getDate(); i <= lastDay; i++) {
+            const dateObj = new Date(year, month, i);
+            const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            days.push(dateStr);
+        }
+        return days;
+    };
+
+    // --- API Calls ---
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(API_URL, {
+                method: 'GET',
+                headers: {
+                    'X-Master-Key': MASTER_KEY,
+                    'X-Bin-Meta': 'false' // Returns only the actual data, not metadata
+                }
+            });
+            const json = await response.json();
+            
+            if (json && json.days && Array.isArray(json.days)) {
+                data = json.days;
+            } else {
+                data = [];
+            }
+            
+            // Auto generate days if perfectly empty
+            if(data.length === 0) {
+                const dates = getDaysUntilEndOfMonth();
+                dates.forEach(dateStr => {
+                    data.push({
+                        date: dateStr,
+                        jebraRead: false, jebraGym: false, jebraStudy: false,
+                        memoRead: false, memoGym: false, memoStudy: false
+                    });
+                });
+                await saveDataAPI(data); // Sync default days
+            } else {
+                renderTracker();
+                setLoading(false);
+            }
+            
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            alert('Failed to connect to the cloud. Please check your internet connection.');
+            setLoading(false);
+        }
+    };
+
+    const saveDataAPI = async (newData) => {
+        setLoading(true);
+        try {
+            await fetch(API_URL, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': MASTER_KEY
+                },
+                body: JSON.stringify({ days: newData })
+            });
+            data = newData;
+            renderTracker();
+        } catch (error) {
+            console.error('Error saving data:', error);
+            alert('Failed to save data. Try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // --- Scoring ---
+    const calculateScore = (read, gym, study) => {
+        let count = 0;
+        if (read) count++;
+        if (gym) count++;
+        if (study) count++;
+        return count + (count === 3 ? 1 : 0);
+    };
+
+    const getScoreClass = (score) => {
+        if (score === 4) return 'score-perfect';
+        if (score === 2 || score === 3) return 'score-good';
+        return 'score-bad';
+    };
+
+    // --- Render Daily Tracker ---
+    const renderTracker = () => {
+        let todayHtml = '';
+        let currentMonthHtml = '';
+        let oldDaysHtml = '';
+
+        const realToday = new Date();
+        realToday.setHours(0,0,0,0);
+        const realTodayTime = realToday.getTime();
+        const currentMonth = realToday.getMonth();
+        const currentYear = realToday.getFullYear();
+
+        data.forEach((day, index) => {
+            
+            const jebraScore = calculateScore(day.jebraRead, day.jebraGym, day.jebraStudy);
+            const memoScore = calculateScore(day.memoRead, day.memoGym, day.memoStudy);
+            
+            let winnerHtml = '';
+            if (jebraScore === 4 && memoScore === 4) {
+                winnerHtml = '<span class="winner-badge perfect">🏆 Perfect Day</span>';
+            } else if (jebraScore > memoScore) {
+                winnerHtml = '<span class="winner-badge jebra">Jebra Won</span>';
+            } else if (memoScore > jebraScore) {
+                winnerHtml = '<span class="winner-badge memo">Memo Won</span>';
+            } else {
+                winnerHtml = '<span class="winner-badge">Tie</span>';
+            }
+
+            // Determine categorization
+            const dayDate = new Date(`${day.date}, ${currentYear}`);
+            dayDate.setHours(0,0,0,0);
+            const isToday = dayDate.getTime() === realTodayTime;
+            const isOldDay = dayDate.getMonth() < currentMonth || dayDate.getFullYear() < currentYear;
+
+            // Generate HTML for the day
+            const dayCardHtml = `
+                <div class="day-container">
+                    <div class="day-header">
+                        <div class="day-date">${isToday ? '<span style="color:var(--perfect-green);">🌟 Today: </span>' : ''}${day.date}</div>
+                        <div class="day-winner">${winnerHtml}</div>
+                    </div>
+                    <div class="day-cards">
+                        <!-- Jebra's Card -->
+                        <div class="player-card jebra">
+                            <div class="player-header">
+                                <div class="player-name">Jebra</div>
+                                <div class="score-badge ${getScoreClass(jebraScore)}">${jebraScore}</div>
+                            </div>
+                            <div class="task-list">
+                                <label class="task-item">
+                                    <span>Read</span>
+                                    <input type="checkbox" class="task-cb" data-index="${index}" data-user="jebra" data-task="Read" ${day.jebraRead ? 'checked' : ''}>
+                                </label>
+                                <label class="task-item">
+                                    <span>Gym</span>
+                                    <input type="checkbox" class="task-cb" data-index="${index}" data-user="jebra" data-task="Gym" ${day.jebraGym ? 'checked' : ''}>
+                                </label>
+                                <label class="task-item">
+                                    <span>Study</span>
+                                    <input type="checkbox" class="task-cb" data-index="${index}" data-user="jebra" data-task="Study" ${day.jebraStudy ? 'checked' : ''}>
+                                </label>
+                            </div>
+                        </div>
+                        <!-- Memo's Card -->
+                        <div class="player-card memo">
+                            <div class="player-header">
+                                <div class="player-name">Memo</div>
+                                <div class="score-badge ${getScoreClass(memoScore)}">${memoScore}</div>
+                            </div>
+                            <div class="task-list">
+                                <label class="task-item">
+                                    <span>Read</span>
+                                    <input type="checkbox" class="task-cb" data-index="${index}" data-user="memo" data-task="Read" ${day.memoRead ? 'checked' : ''}>
+                                </label>
+                                <label class="task-item">
+                                    <span>Gym</span>
+                                    <input type="checkbox" class="task-cb" data-index="${index}" data-user="memo" data-task="Gym" ${day.memoGym ? 'checked' : ''}>
+                                </label>
+                                <label class="task-item">
+                                    <span>Study</span>
+                                    <input type="checkbox" class="task-cb" data-index="${index}" data-user="memo" data-task="Study" ${day.memoStudy ? 'checked' : ''}>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (isToday) {
+                todayHtml += dayCardHtml;
+            } else if (isOldDay) {
+                oldDaysHtml += dayCardHtml;
+            } else {
+                currentMonthHtml += dayCardHtml;
+            }
+        });
+
+        // Render into DOM
+        todayContainer.innerHTML = todayHtml;
+        trackerList.innerHTML = currentMonthHtml;
+        oldDaysList.innerHTML = oldDaysHtml;
+
+        // Show/Hide sections conditionally
+        trackerDivider.style.display = (todayHtml !== '' && currentMonthHtml !== '') ? 'block' : 'none';
+        oldDaysWrapper.style.display = oldDaysHtml !== '' ? 'block' : 'none';
+
+        // Attach events to checkboxes
+        document.querySelectorAll('.task-cb').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const index = e.target.dataset.index;
+                const user = e.target.dataset.user;
+                const task = e.target.dataset.task;
+                
+                // create a deep copy to mutate
+                const newData = JSON.parse(JSON.stringify(data));
+                newData[index][`${user}${task}`] = e.target.checked;
+                saveDataAPI(newData);
+            });
+        });
+    };
+
+    addDayBtn.addEventListener('click', () => {
+        let nextDateStr = `Day ${data.length + 1}`;
+        if (data.length > 0) {
+            const lastDateStr = data[data.length - 1].date;
+            const lastDate = new Date(`${lastDateStr}, ${new Date().getFullYear()}`);
+            if (!isNaN(lastDate.getTime())) {
+                lastDate.setDate(lastDate.getDate() + 1);
+                nextDateStr = lastDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            }
+        } else {
+            nextDateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        }
+
+        const newData = JSON.parse(JSON.stringify(data));
+        newData.push({
+            date: nextDateStr,
+            jebraRead: false, jebraGym: false, jebraStudy: false,
+            memoRead: false, memoGym: false, memoStudy: false
+        });
+        saveDataAPI(newData);
+    });
+
+    // --- Statistics & Leaderboard ---
+    const updateStats = () => {
+        let jebraTotal = 0, memoTotal = 0;
+        let jebraFull = 0, memoFull = 0;
+        let days = data.length;
+
+        data.forEach(day => {
+            const jScore = calculateScore(day.jebraRead, day.jebraGym, day.jebraStudy);
+            const mScore = calculateScore(day.memoRead, day.memoGym, day.memoStudy);
+            
+            jebraTotal += jScore;
+            memoTotal += mScore;
+            
+            if(jScore === 4) jebraFull++;
+            if(mScore === 4) memoFull++;
+        });
+
+        const maxPossible = days * 4;
+        const jebraCommit = days ? Math.round((jebraTotal / maxPossible) * 100) : 0;
+        const memoCommit = days ? Math.round((memoTotal / maxPossible) * 100) : 0;
+
+        document.getElementById('jebra-total').innerText = jebraTotal;
+        document.getElementById('jebra-full').innerText = jebraFull;
+        document.getElementById('jebra-commit').innerText = `${jebraCommit}%`;
+
+        document.getElementById('memo-total').innerText = memoTotal;
+        document.getElementById('memo-full').innerText = memoFull;
+        document.getElementById('memo-commit').innerText = `${memoCommit}%`;
+
+        const leaderboardData = [
+            { name: 'Jebra', total: jebraTotal, full: jebraFull, commit: jebraCommit },
+            { name: 'Memo', total: memoTotal, full: memoFull, commit: memoCommit }
+        ].sort((a, b) => b.total - a.total);
+
+        const lbBody = document.getElementById('leaderboard-body');
+        lbBody.innerHTML = leaderboardData.map((player, idx) => `
+            <tr>
+                <td class="rank-${idx + 1}">#${idx + 1}</td>
+                <td><strong>${player.name}</strong></td>
+                <td>${player.total}</td>
+                <td>${player.full}</td>
+                <td>${player.commit}%</td>
+            </tr>
+        `).join('');
+    };
+
+    // --- Initialization ---
+    // Start by fetching data from the cloud
+    fetchData();
+});
