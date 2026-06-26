@@ -196,15 +196,24 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <div class="task-list">
                                 <label class="task-item">
-                                    <span>Read</span>
+                                    <div class="task-name-wrapper" style="display: flex; align-items: center;">
+                                        <span class="task-name-text">${day.jebraReadName || 'Read'}</span>
+                                        <button class="edit-task-btn" data-index="${index}" data-user="jebra" data-task="Read" style="background: none; border: none; cursor: pointer; margin-left: 8px; font-size: 0.9rem;">✏️</button>
+                                    </div>
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="jebra" data-task="Read" ${day.jebraRead ? 'checked' : ''}>
                                 </label>
                                 <label class="task-item">
-                                    <span>Gym or any task</span>
+                                    <div class="task-name-wrapper" style="display: flex; align-items: center;">
+                                        <span class="task-name-text">${day.jebraGymName || 'Gym or any task'}</span>
+                                        <button class="edit-task-btn" data-index="${index}" data-user="jebra" data-task="Gym" style="background: none; border: none; cursor: pointer; margin-left: 8px; font-size: 0.9rem;">✏️</button>
+                                    </div>
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="jebra" data-task="Gym" ${day.jebraGym ? 'checked' : ''}>
                                 </label>
                                 <label class="task-item">
-                                    <span>Study</span>
+                                    <div class="task-name-wrapper" style="display: flex; align-items: center;">
+                                        <span class="task-name-text">${day.jebraStudyName || 'Study'}</span>
+                                        <button class="edit-task-btn" data-index="${index}" data-user="jebra" data-task="Study" style="background: none; border: none; cursor: pointer; margin-left: 8px; font-size: 0.9rem;">✏️</button>
+                                    </div>
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="jebra" data-task="Study" ${day.jebraStudy ? 'checked' : ''}>
                                 </label>
                             </div>
@@ -217,15 +226,24 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <div class="task-list">
                                 <label class="task-item">
-                                    <span>Read</span>
+                                    <div class="task-name-wrapper" style="display: flex; align-items: center;">
+                                        <span class="task-name-text">${day.memoReadName || 'Read'}</span>
+                                        <button class="edit-task-btn" data-index="${index}" data-user="memo" data-task="Read" style="background: none; border: none; cursor: pointer; margin-left: 8px; font-size: 0.9rem;">✏️</button>
+                                    </div>
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="memo" data-task="Read" ${day.memoRead ? 'checked' : ''}>
                                 </label>
                                 <label class="task-item">
-                                    <span>Gym or any task</span>
+                                    <div class="task-name-wrapper" style="display: flex; align-items: center;">
+                                        <span class="task-name-text">${day.memoGymName || 'Gym or any task'}</span>
+                                        <button class="edit-task-btn" data-index="${index}" data-user="memo" data-task="Gym" style="background: none; border: none; cursor: pointer; margin-left: 8px; font-size: 0.9rem;">✏️</button>
+                                    </div>
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="memo" data-task="Gym" ${day.memoGym ? 'checked' : ''}>
                                 </label>
                                 <label class="task-item">
-                                    <span>Study</span>
+                                    <div class="task-name-wrapper" style="display: flex; align-items: center;">
+                                        <span class="task-name-text">${day.memoStudyName || 'Study'}</span>
+                                        <button class="edit-task-btn" data-index="${index}" data-user="memo" data-task="Study" style="background: none; border: none; cursor: pointer; margin-left: 8px; font-size: 0.9rem;">✏️</button>
+                                    </div>
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="memo" data-task="Study" ${day.memoStudy ? 'checked' : ''}>
                                 </label>
                             </div>
@@ -276,6 +294,44 @@ document.addEventListener('DOMContentLoaded', () => {
                     newData.splice(index, 1);
                     saveDataAPI(newData);
                 }
+            });
+        });
+
+        // Attach events to edit task buttons
+        document.querySelectorAll('.edit-task-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault(); // prevents label default checkbox toggle
+                
+                const index = e.currentTarget.dataset.index;
+                const user = e.currentTarget.dataset.user;
+                const task = e.currentTarget.dataset.task;
+                const taskNameKey = `${user}${task}Name`;
+                
+                const wrapper = e.currentTarget.closest('.task-name-wrapper');
+                
+                let defaultName = 'Gym or any task';
+                if(task === 'Read') defaultName = 'Read';
+                if(task === 'Study') defaultName = 'Study';
+                
+                const currentName = data[index][taskNameKey] || defaultName;
+                
+                wrapper.innerHTML = `
+                    <input type="text" class="edit-task-input" value="${currentName}" style="width: 100px; padding: 2px 4px; border-radius: 4px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: white;">
+                    <button class="save-task-btn btn-primary" style="padding: 2px 6px; font-size: 0.8rem; margin-left: 5px;">Save</button>
+                `;
+                
+                // Prevent checkbox toggle when clicking inside the input
+                wrapper.querySelector('.edit-task-input').addEventListener('click', (ev) => ev.preventDefault());
+                
+                wrapper.querySelector('.save-task-btn').addEventListener('click', (ev) => {
+                    ev.preventDefault();
+                    const newName = wrapper.querySelector('.edit-task-input').value;
+                    if(newName.trim() !== '') {
+                        const newData = JSON.parse(JSON.stringify(data));
+                        newData[index][taskNameKey] = newName.trim();
+                        saveDataAPI(newData);
+                    }
+                });
             });
         });
     };
