@@ -7,7 +7,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <script>
+        var cacheBuster = new URLSearchParams(window.location.search).get('v') || '1.0';
+        document.write('<link rel="stylesheet" href="style.css?v=' + cacheBuster + '">');
+    </script>
 </head>
 <body>
     <div class="app-container">
@@ -91,6 +94,9 @@
             </section>
         </main>
     </div>
-    <script src="app.js"></script>
+    <script>
+        var cacheBuster = new URLSearchParams(window.location.search).get('v') || '1.0';
+        document.write('<script src="app.js?v=' + cacheBuster + '"></' + 'script>');
+    </script>
 </body>
 </html>
