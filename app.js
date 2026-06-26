@@ -348,6 +348,17 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
     };
 
+    // --- Clear Cache ---
+    const clearCacheBtn = document.getElementById('clear-cache-btn');
+    if (clearCacheBtn) {
+        clearCacheBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear cache and force reload? This will fetch the latest updates.')) {
+                // Append a timestamp to the URL to bypass browser cache
+                window.location.href = window.location.href.split('?')[0] + '?v=' + new Date().getTime();
+            }
+        });
+    }
+
     // --- Initialization ---
     // Start by fetching data from the cloud
     fetchData();
