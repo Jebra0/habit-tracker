@@ -182,7 +182,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="day-container">
                     <div class="day-header">
                         <div class="day-date">${isToday ? '<span style="color:var(--perfect-green);">🌟 Today: </span>' : ''}${day.date}</div>
-                        <div class="day-winner">${winnerHtml}</div>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div class="day-winner">${winnerHtml}</div>
+                            <button class="delete-day-btn btn-danger" data-index="${index}">🗑️ Delete</button>
+                        </div>
                     </div>
                     <div class="day-cards">
                         <!-- Jebra's Card -->
@@ -260,6 +263,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const newData = JSON.parse(JSON.stringify(data));
                 newData[index][`${user}${task}`] = e.target.checked;
                 saveDataAPI(newData);
+            });
+        });
+
+        // Attach events to delete buttons
+        document.querySelectorAll('.delete-day-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const btnElement = e.target.closest('.delete-day-btn');
+                const index = btnElement.dataset.index;
+                if (confirm(`Are you sure you want to delete ${data[index].date}?`)) {
+                    const newData = JSON.parse(JSON.stringify(data));
+                    newData.splice(index, 1);
+                    saveDataAPI(newData);
+                }
             });
         });
     };

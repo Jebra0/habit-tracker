@@ -152,6 +152,25 @@ nav {
     box-shadow: 0 5px 15px rgba(236, 72, 153, 0.4);
 }
 
+.btn-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--bad-red);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.4);
+    border-color: var(--bad-red);
+}
+
 /* Daily Tracker Cards */
 .day-container {
     background: var(--glass-bg);
