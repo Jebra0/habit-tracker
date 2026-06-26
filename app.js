@@ -348,6 +348,23 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
     };
 
+    // --- Settings Dropdown ---
+    const settingsBtn = document.querySelector('.settings-btn');
+    const dropdownContent = document.querySelector('.dropdown-content');
+    
+    if (settingsBtn && dropdownContent) {
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdownContent.classList.toggle('show');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.settings-dropdown')) {
+                dropdownContent.classList.remove('show');
+            }
+        });
+    }
+
     // --- Clear Cache ---
     const clearCacheBtn = document.getElementById('clear-cache-btn');
     if (clearCacheBtn) {

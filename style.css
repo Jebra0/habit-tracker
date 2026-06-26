@@ -98,7 +98,7 @@ header p {
     overflow: hidden;
 }
 
-.settings-dropdown:hover .dropdown-content {
+.dropdown-content.show {
     display: block;
     animation: fadeIn 0.2s ease forwards;
 }
