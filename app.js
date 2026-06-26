@@ -184,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="day-date">${isToday ? '<span style="color:var(--perfect-green);">🌟 Today: </span>' : ''}${day.date}</div>
                         <div style="display: flex; align-items: center; gap: 1rem;">
                             <div class="day-winner">${winnerHtml}</div>
-                            <button class="delete-day-btn btn-danger" data-index="${index}">🗑️ Delete</button>
+                            <!-- <button class="delete-day-btn btn-danger" data-index="${index}">🗑️ Delete</button> -->
                         </div>
                     </div>
                     <div class="day-cards">
