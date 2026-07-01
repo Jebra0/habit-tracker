@@ -25,8 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let data = [];
     const trackerList = document.getElementById('tracker-list');
     const todayContainer = document.getElementById('today-container');
-    const oldDaysList = document.getElementById('old-days-list');
-    const oldDaysWrapper = document.getElementById('old-days-wrapper');
+    const lastDaysList = document.getElementById('last-days-list');
     const trackerDivider = document.getElementById('tracker-divider');
     const addDayBtn = document.getElementById('add-day-btn');
 
@@ -37,32 +36,54 @@ document.addEventListener('DOMContentLoaded', () => {
             todayContainer.style.opacity = '0.5';
             trackerList.style.pointerEvents = 'none';
             todayContainer.style.pointerEvents = 'none';
-            addDayBtn.innerText = 'Syncing...';
-            addDayBtn.disabled = true;
+            if(addDayBtn) {
+                addDayBtn.innerText = 'Syncing...';
+                addDayBtn.disabled = true;
+            }
         } else {
             trackerList.style.opacity = '1';
             todayContainer.style.opacity = '1';
             trackerList.style.pointerEvents = 'all';
             todayContainer.style.pointerEvents = 'all';
-            addDayBtn.innerText = 'Add Next Day';
-            addDayBtn.disabled = false;
+            if(addDayBtn) {
+                addDayBtn.innerText = 'Add Next Day';
+                addDayBtn.disabled = false;
+            }
         }
     };
 
     // --- Date Generation Logic ---
-    const getDaysUntilEndOfMonth = () => {
+    const ensureFutureDays = () => {
         const today = new Date();
         const year = today.getFullYear();
         const month = today.getMonth();
-        const lastDay = new Date(year, month + 1, 0).getDate();
+        const date = today.getDate();
         
-        const days = [];
-        for (let i = today.getDate(); i <= lastDay; i++) {
-            const dateObj = new Date(year, month, i);
+        let changed = false;
+        
+        for (let i = 0; i <= 2; i++) {
+            const dateObj = new Date(year, month, date + i);
             const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            days.push(dateStr);
+            
+            const exists = data.some(d => d.date === dateStr);
+            if (!exists) {
+                data.push({
+                    date: dateStr,
+                    jebraRead: false, jebraGym: false, jebraStudy: false, jebraStretch: false,
+                    memoRead: false, memoGym: false, memoStudy: false, memoStretch: false
+                });
+                changed = true;
+            }
         }
-        return days;
+        
+        if (changed) {
+            data.sort((a, b) => {
+                const dateA = new Date(`${a.date}, ${new Date().getFullYear()}`).getTime();
+                const dateB = new Date(`${b.date}, ${new Date().getFullYear()}`).getTime();
+                return dateA - dateB;
+            });
+        }
+        return changed;
     };
 
     // --- API Calls ---
@@ -84,17 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 data = [];
             }
             
-            // Auto generate days if perfectly empty
-            if(data.length === 0) {
-                const dates = getDaysUntilEndOfMonth();
-                dates.forEach(dateStr => {
-                    data.push({
-                        date: dateStr,
-                        jebraRead: false, jebraGym: false, jebraStudy: false,
-                        memoRead: false, memoGym: false, memoStudy: false
-                    });
-                });
-                await saveDataAPI(data); // Sync default days
+            const changed = ensureFutureDays();
+            
+            if(changed) {
+                await saveDataAPI(data, true);
             } else {
                 renderTracker();
                 setLoading(false);
@@ -107,34 +121,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const saveDataAPI = async (newData) => {
-        setLoading(true);
-        try {
-            await fetch(API_URL, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Master-Key': MASTER_KEY
-                },
-                body: JSON.stringify({ days: newData })
-            });
-            data = newData;
-            renderTracker();
-        } catch (error) {
-            console.error('Error saving data:', error);
-            alert('Failed to save data. Try again.');
-        } finally {
+    let saveTimeout = null;
+    const saveDataAPI = async (newData, immediate = false) => {
+        // Optimistically update the UI for snappy UX
+        data = newData;
+        renderTracker();
+
+        const saveRequest = async (dataToSave) => {
+            try {
+                await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': MASTER_KEY
+                    },
+                    body: JSON.stringify({ days: dataToSave })
+                });
+            } catch (error) {
+                console.error('Error saving data:', error);
+                alert('Failed to sync to cloud. Changes may not be saved.');
+            }
+        };
+
+        if (immediate) {
+            setLoading(true);
+            await saveRequest(newData);
             setLoading(false);
+            return;
         }
+
+        // Debounce subsequent saves by 2.5 seconds to limit API requests
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => saveRequest(newData), 2500);
     };
 
     // --- Scoring ---
-    const calculateScore = (read, gym, study) => {
+    const calculateScore = (read, gym, study, stretch) => {
         let count = 0;
         if (read) count++;
         if (gym) count++;
         if (study) count++;
-        return count + (count === 3 ? 1 : 0);
+        if (stretch) count++;
+        
+        // Backward compatibility for old days where stretch didn't exist
+        if (stretch === undefined && count === 3) {
+            return 4;
+        }
+        return count;
     };
 
     const getScoreClass = (score) => {
@@ -146,19 +179,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Render Daily Tracker ---
     const renderTracker = () => {
         let todayHtml = '';
-        let currentMonthHtml = '';
-        let oldDaysHtml = '';
+        let futureHtml = '';
+        let pastHtml = '';
+        let futureCount = 0;
 
         const realToday = new Date();
         realToday.setHours(0,0,0,0);
         const realTodayTime = realToday.getTime();
-        const currentMonth = realToday.getMonth();
         const currentYear = realToday.getFullYear();
 
         data.forEach((day, index) => {
             
-            const jebraScore = calculateScore(day.jebraRead, day.jebraGym, day.jebraStudy);
-            const memoScore = calculateScore(day.memoRead, day.memoGym, day.memoStudy);
+            const jebraScore = calculateScore(day.jebraRead, day.jebraGym, day.jebraStudy, day.jebraStretch);
+            const memoScore = calculateScore(day.memoRead, day.memoGym, day.memoStudy, day.memoStretch);
             
             let winnerHtml = '';
             if (jebraScore === 4 && memoScore === 4) {
@@ -174,8 +207,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Determine categorization
             const dayDate = new Date(`${day.date}, ${currentYear}`);
             dayDate.setHours(0,0,0,0);
-            const isToday = dayDate.getTime() === realTodayTime;
-            const isOldDay = dayDate.getMonth() < currentMonth || dayDate.getFullYear() < currentYear;
+            const dayTime = dayDate.getTime();
+            const isToday = dayTime === realTodayTime;
+            const isPast = dayTime < realTodayTime;
 
             // Generate HTML for the day
             const dayCardHtml = `
@@ -216,6 +250,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="jebra" data-task="Study" ${day.jebraStudy ? 'checked' : ''}>
                                 </label>
+                                <label class="task-item">
+                                    <div class="task-name-wrapper" style="display: flex; align-items: center;">
+                                        <span class="task-name-text">${day.jebraStretchName || 'Stretches'}</span>
+                                        <button class="edit-task-btn" data-index="${index}" data-user="jebra" data-task="Stretch" style="background: none; border: none; cursor: pointer; margin-left: 8px; font-size: 0.9rem;">✏️</button>
+                                    </div>
+                                    <input type="checkbox" class="task-cb" data-index="${index}" data-user="jebra" data-task="Stretch" ${day.jebraStretch ? 'checked' : ''}>
+                                </label>
                             </div>
                         </div>
                         <!-- Memo's Card -->
@@ -246,29 +287,38 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                     <input type="checkbox" class="task-cb" data-index="${index}" data-user="memo" data-task="Study" ${day.memoStudy ? 'checked' : ''}>
                                 </label>
+                                <label class="task-item">
+                                    <div class="task-name-wrapper" style="display: flex; align-items: center;">
+                                        <span class="task-name-text">${day.memoStretchName || 'Stretches'}</span>
+                                        <button class="edit-task-btn" data-index="${index}" data-user="memo" data-task="Stretch" style="background: none; border: none; cursor: pointer; margin-left: 8px; font-size: 0.9rem;">✏️</button>
+                                    </div>
+                                    <input type="checkbox" class="task-cb" data-index="${index}" data-user="memo" data-task="Stretch" ${day.memoStretch ? 'checked' : ''}>
+                                </label>
                             </div>
                         </div>
                     </div>
                 </div>
             `;
 
-            if (isToday) {
+            if (isPast) {
+                pastHtml += dayCardHtml;
+            } else if (isToday) {
                 todayHtml += dayCardHtml;
-            } else if (isOldDay) {
-                oldDaysHtml += dayCardHtml;
             } else {
-                currentMonthHtml += dayCardHtml;
+                if (futureCount < 2) {
+                    futureHtml += dayCardHtml;
+                    futureCount++;
+                }
             }
         });
 
         // Render into DOM
         todayContainer.innerHTML = todayHtml;
-        trackerList.innerHTML = currentMonthHtml;
-        oldDaysList.innerHTML = oldDaysHtml;
+        trackerList.innerHTML = futureHtml;
+        if (lastDaysList) lastDaysList.innerHTML = pastHtml;
 
         // Show/Hide sections conditionally
-        trackerDivider.style.display = (todayHtml !== '' && currentMonthHtml !== '') ? 'block' : 'none';
-        oldDaysWrapper.style.display = oldDaysHtml !== '' ? 'block' : 'none';
+        trackerDivider.style.display = (todayHtml !== '' && futureHtml !== '') ? 'block' : 'none';
 
         // Attach events to checkboxes
         document.querySelectorAll('.task-cb').forEach(cb => {
@@ -312,6 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let defaultName = 'Gym or any task';
                 if(task === 'Read') defaultName = 'Read';
                 if(task === 'Study') defaultName = 'Study';
+                if(task === 'Stretch') defaultName = 'Stretches';
                 
                 const currentName = data[index][taskNameKey] || defaultName;
                 
@@ -334,29 +385,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
         });
+
+        // Update quick scores and stats
+        updateStats();
     };
 
-    addDayBtn.addEventListener('click', () => {
-        let nextDateStr = `Day ${data.length + 1}`;
-        if (data.length > 0) {
-            const lastDateStr = data[data.length - 1].date;
-            const lastDate = new Date(`${lastDateStr}, ${new Date().getFullYear()}`);
-            if (!isNaN(lastDate.getTime())) {
-                lastDate.setDate(lastDate.getDate() + 1);
-                nextDateStr = lastDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    /*
+    if(addDayBtn) {
+        addDayBtn.addEventListener('click', () => {
+            let nextDateStr = `Day ${data.length + 1}`;
+            if (data.length > 0) {
+                const lastDateStr = data[data.length - 1].date;
+                const lastDate = new Date(`${lastDateStr}, ${new Date().getFullYear()}`);
+                if (!isNaN(lastDate.getTime())) {
+                    lastDate.setDate(lastDate.getDate() + 1);
+                    nextDateStr = lastDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                }
+            } else {
+                nextDateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             }
-        } else {
-            nextDateStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        }
 
-        const newData = JSON.parse(JSON.stringify(data));
-        newData.push({
-            date: nextDateStr,
-            jebraRead: false, jebraGym: false, jebraStudy: false,
-            memoRead: false, memoGym: false, memoStudy: false
+            const newData = JSON.parse(JSON.stringify(data));
+            newData.push({
+                date: nextDateStr,
+                jebraRead: false, jebraGym: false, jebraStudy: false, jebraStretch: false,
+                memoRead: false, memoGym: false, memoStudy: false, memoStretch: false
+            });
+            saveDataAPI(newData);
         });
-        saveDataAPI(newData);
-    });
+    }
+    */
 
     // --- Statistics & Leaderboard ---
     const updateStats = () => {
@@ -365,8 +423,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let days = data.length;
 
         data.forEach(day => {
-            const jScore = calculateScore(day.jebraRead, day.jebraGym, day.jebraStudy);
-            const mScore = calculateScore(day.memoRead, day.memoGym, day.memoStudy);
+            const jScore = calculateScore(day.jebraRead, day.jebraGym, day.jebraStudy, day.jebraStretch);
+            const mScore = calculateScore(day.memoRead, day.memoGym, day.memoStudy, day.memoStretch);
             
             jebraTotal += jScore;
             memoTotal += mScore;
@@ -387,21 +445,32 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('memo-full').innerText = memoFull;
         document.getElementById('memo-commit').innerText = `${memoCommit}%`;
 
+        const jQuick = document.getElementById('jebra-quick-score');
+        const mQuick = document.getElementById('memo-quick-score');
+        if(jQuick) jQuick.innerText = jebraTotal;
+        if(mQuick) mQuick.innerText = memoTotal;
+
         const leaderboardData = [
             { name: 'Jebra', total: jebraTotal, full: jebraFull, commit: jebraCommit },
             { name: 'Memo', total: memoTotal, full: memoFull, commit: memoCommit }
         ].sort((a, b) => b.total - a.total);
 
+        const isTie = leaderboardData.length > 1 && leaderboardData[0].total === leaderboardData[1].total;
+
         const lbBody = document.getElementById('leaderboard-body');
-        lbBody.innerHTML = leaderboardData.map((player, idx) => `
-            <tr>
-                <td class="rank-${idx + 1}">#${idx + 1}</td>
-                <td><strong>${player.name}</strong></td>
-                <td>${player.total}</td>
-                <td>${player.full}</td>
-                <td>${player.commit}%</td>
-            </tr>
-        `).join('');
+        lbBody.innerHTML = leaderboardData.map((player, idx) => {
+            const rankDisplay = isTie ? '-' : `#${idx + 1}`;
+            const rankClass = isTie ? 'rank-tie' : `rank-${idx + 1}`;
+            return `
+                <tr>
+                    <td class="${rankClass}">${rankDisplay}</td>
+                    <td><strong>${player.name}</strong></td>
+                    <td>${player.total}</td>
+                    <td>${player.full}</td>
+                    <td>${player.commit}%</td>
+                </tr>
+            `;
+        }).join('');
     };
 
     // --- Settings Dropdown ---

@@ -29,6 +29,7 @@
 
         <nav>
             <button class="nav-btn active" data-target="tracker">Daily Tracker</button>
+            <button class="nav-btn" data-target="last-days">Last Days</button>
             <button class="nav-btn" data-target="stats">Statistics</button>
             <button class="nav-btn" data-target="leaderboard">Leaderboard</button>
         </nav>
@@ -36,8 +37,19 @@
         <main>
             <!-- Daily Tracker Section -->
             <section id="tracker" class="tab-content active">
-                <div class="actions">
-                    <button id="add-day-btn" class="btn-primary">Add Next Day</button>
+                <div class="actions" style="display: none;">
+                    <!-- <button id="add-day-btn" class="btn-primary">Add Next Day</button> -->
+                </div>
+                
+                <div class="quick-score glass-panel" style="display: flex; justify-content: space-around; margin-bottom: 2rem; padding: 1.5rem; text-align: center;">
+                    <div>
+                        <h3 style="color: var(--jebra-color); margin-bottom: 0.5rem; font-size: 1.2rem;">Jebra</h3>
+                        <div style="font-size: 2.5rem; font-weight: 800;" id="jebra-quick-score">0</div>
+                    </div>
+                    <div>
+                        <h3 style="color: var(--memo-color); margin-bottom: 0.5rem; font-size: 1.2rem;">Memo</h3>
+                        <div style="font-size: 2.5rem; font-weight: 800;" id="memo-quick-score">0</div>
+                    </div>
                 </div>
                 
                 <!-- Today Section -->
@@ -45,14 +57,14 @@
                 
                 <hr id="tracker-divider" style="margin: 2rem 0; border: none; border-top: 1px dashed rgba(255,255,255,0.2); display: none;">
                 
-                <!-- Current Month Section -->
+                <!-- Future Days Section -->
                 <div id="tracker-list"></div>
+            </section>
 
-                <!-- Old Days Section (Past Months) -->
-                <div id="old-days-wrapper" style="display: none; margin-top: 3rem;">
-                    <h3 style="margin-bottom: 1.5rem; color: var(--text-muted); border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">Old Days (Past Months)</h3>
-                    <div id="old-days-list"></div>
-                </div>
+            <!-- Last Days Section -->
+            <section id="last-days" class="tab-content">
+                <h3 style="margin-bottom: 1.5rem; color: var(--text-muted); border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem; text-align: left;">Past Days</h3>
+                <div id="last-days-list"></div>
             </section>
 
             <!-- Statistics Section -->
@@ -61,13 +73,13 @@
                     <div class="stat-card glass-panel jebra-card">
                         <h3>Jebra's Stats</h3>
                         <div class="stat-row"><span>Total Points</span> <strong id="jebra-total">0</strong></div>
-                        <div class="stat-row"><span>Full Days (3/3)</span> <strong id="jebra-full">0</strong></div>
+                        <div class="stat-row"><span>Full Days (4/4)</span> <strong id="jebra-full">0</strong></div>
                         <div class="stat-row"><span>Commitment</span> <strong id="jebra-commit">0%</strong></div>
                     </div>
                     <div class="stat-card glass-panel memo-card">
                         <h3>Memo's Stats</h3>
                         <div class="stat-row"><span>Total Points</span> <strong id="memo-total">0</strong></div>
-                        <div class="stat-row"><span>Full Days (3/3)</span> <strong id="memo-full">0</strong></div>
+                        <div class="stat-row"><span>Full Days (4/4)</span> <strong id="memo-full">0</strong></div>
                         <div class="stat-row"><span>Commitment</span> <strong id="memo-commit">0%</strong></div>
                     </div>
                 </div>
